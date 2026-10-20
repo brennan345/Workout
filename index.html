@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14161a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>Workout</title>
+<style>
+:root{--bg:#14161a;--card:#21252c;--line:#333943;--text:#f2f4f7;--mute:#9aa3b0;--acc:#f5a524}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font:18px/1.35 system-ui,sans-serif;padding:0 12px 110px}
+button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:12px;min-height:56px;padding:0 14px}
+button:active{background:var(--line)}
+#nav{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:12px 0;position:sticky;top:0;background:var(--bg);z-index:5}
+.daybtn{padding:0;min-height:62px;font-size:13px;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.daybtn b{font-size:20px}
+.daybtn.on{background:var(--acc);color:#14161a;border-color:var(--acc)}
+h1{font-size:26px;margin:8px 0 12px}
+h3{margin:14px 0 4px;color:var(--mute);font-size:16px}
+details.sec{background:var(--card);border-radius:14px;margin-bottom:12px}
+details.sec>summary{font-size:21px;font-weight:700;padding:16px;min-height:56px;cursor:pointer}
+.sec .body{padding:0 12px 12px}
+.list{margin:0;padding:0 4px;list-style:none}
+.list li{padding:9px 0;border-bottom:1px solid var(--line)}
+.ex{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
+.ex.done{opacity:.5}
+.ex.done .nm{text-decoration:line-through}
+.top{display:flex;align-items:center;gap:10px;min-height:56px}
+.box{width:34px;height:34px;flex:none;border:2px solid var(--mute);border-radius:8px;display:grid;place-items:center;color:var(--acc);font-weight:900}
+.nm{flex:1;font-weight:600}
+.sr{font-size:22px;font-weight:800;color:var(--acc);text-align:right}
+.wt{display:flex;align-items:center;gap:8px;justify-content:center;margin:6px 0}
+.wt button{width:64px;font-size:28px}
+.wt input{width:110px;height:56px;font:inherit;font-size:26px;font-weight:700;text-align:center;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:12px}
+.wt input::placeholder{color:var(--text);opacity:1}
+.hist{color:var(--mute);font-size:16px;padding:4px 0}
+.ex summary{color:var(--mute);padding:8px 0;min-height:44px}
+.bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:10px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line)}
+.bar button{flex:1}
+.bar .next{background:var(--acc);color:#14161a;font-weight:700;border-color:var(--acc)}
+.data{display:flex;gap:10px;margin-top:16px}
+.data button{flex:1;min-height:48px;font-size:16px}
+</style>
+</head>
+<body>
+<div id="nav"></div>
+<div id="app"></div>
+<input type="file" id="file" accept="application/json" hidden>
+
+<script>
+// ================= WORKOUT DATA (edit me) =================
+// Each exercise: id (never change it), name (rename freely), sr (sets x reps text), step (lbs per +/- tap)
+const WORKOUT = {
+  warmup: {
+    general: ["Light cardio — 2 minutes","Arm circles — 10 each direction","Arm swings across chest — 10 reps","90/90 hip stretch — 10 reps","Bodyweight squats — 10 reps","Reverse lunges — 5 each leg"],
+    push: ["Band pull-aparts — 15 reps","Scapular push-ups — 12 reps","Light external rotations — 12 each arm","Easy push-ups — 10 reps"],
+    pull: ["Band pull-aparts — 15 reps","Scapular retractions — 10 reps","Light cable rows — 12 reps","Light external rotations — 12 each arm"],
+    legs: ["Ankle rocks — 10 each side","Front-to-back leg swings — 10 each leg","Side-to-side leg swings — 10 each leg","Bodyweight squats — 10 reps","Glute bridges — 10 reps"],
+    upper: ["Wrist circles — 10 each direction","Gentle wrist rocks — 10 reps","Scapular push-ups — 10 reps","Shoulder circles — 8 each direction","Scapular pull-ups — 8 reps"],
+    lower: ["Ankle rocks — 10 each side","Leg swings — 10 each leg","Lateral lunges — 5 each side","Bodyweight Cossack squats — 5 each side","Glute bridges — 10 reps","Low, easy jumps — 5 reps"]
+  },
+  stretch: {
+    push: ["Doorway chest stretch — 20–40 sec","Overhead triceps stretch — 20–30 sec each arm","Cross-body shoulder stretch — 20–30 sec each arm","Wrist flexor stretch — 20–30 sec each arm","Wrist extensor stretch — 20–30 sec each arm"],
+    pull: ["Overhead lat stretch — 20–40 sec","Child's pose with hands reaching forward — 20–40 sec","Cross-body shoulder stretch — 20–30 sec each arm","Forearm flexor stretch — 20–30 sec each arm","Forearm extensor stretch — 20–30 sec each arm"],
+    legs: ["Half-kneeling hip-flexor stretch — 30–40 sec each side","Lying hamstring stretch — 30–40 sec each side","Figure-four glute stretch — 30–40 sec each side","Wall calf stretch, straight knee — 20–30 sec each side","Wall calf stretch, bent knee — 20–30 sec"],
+    upper: ["Wrist flexor stretch — 20–30 sec each arm","Wrist extensor stretch — 20–30 sec each arm","Overhead lat stretch — 30–40 sec","Doorway chest stretch — 20–30 sec","Cross-body shoulder stretch — 20–30 sec each arm"],
+    lower: ["Half-kneeling hip-flexor stretch — 30–40 sec each side","Frog stretch — 20–40 sec","Side-lunge adductor stretch — 20–30 sec each side","Lying hamstring stretch — 30–40 sec each side","Wall calf stretch — 20–30 sec each side","Figure-four glute stretch — 20–30 sec"],
+    rest: ["Half-kneeling hip-flexor stretch — 2×30–40 sec each side","Lying hamstring stretch — 2×30–40 sec each side","Frog stretch — 2×30–40 sec","Wall calf stretch — 2×30 sec each side","Overhead lat stretch — 2×30 sec","Doorway chest stretch — 2×30 sec"]
+  },
+  days: [
+    { name: "Push", warm: "push", stretch: "push", exercises: [
+      { id: "db_bench", name: "Dumbbell Bench Press", sr: "3 × 5–8", step: 5 },
+      { id: "db_ohp", name: "Dumbbell Overhead Press", sr: "3 × 5–8", step: 5 },
+      { id: "wt_dips", name: "Weighted Dips", sr: "3 × 6–10", step: 5 },
+      { id: "cable_fly", name: "Cable Chest Fly", sr: "3 × 8–12", step: 5 },
+      { id: "db_lat_raise", name: "Dumbbell Lateral Raise", sr: "3 × 10–15", step: 2.5 },
+      { id: "cable_tri_ext", name: "Cable Triceps Extension", sr: "3 × 8–15", step: 5 } ] },
+    { name: "Pull", warm: "pull", stretch: "pull", exercises: [
+      { id: "cable_lat_pulldown", name: "Cable Lat Pulldown", sr: "3 × 5–8", step: 5 },
+      { id: "seated_cable_row", name: "Seated Cable Row", sr: "3 × 6–10", step: 5 },
+      { id: "sa_lat_pulldown", name: "Single-Arm Cable Lat Pulldown", sr: "3 × 8–12", step: 5 },
+      { id: "cable_rear_fly", name: "Cable Rear-Delt Fly", sr: "3 × 10–15", step: 2.5 },
+      { id: "db_hammer_curl", name: "Dumbbell Hammer Curl", sr: "3 × 8–12", step: 2.5 },
+      { id: "cable_curl", name: "Cable Curl", sr: "3 × 10–15", step: 5 },
+      { id: "db_farmer", name: "Dumbbell Farmer Carry", sr: "3 × 30–60 sec", step: 5 } ] },
+    { name: "Legs", warm: "legs", stretch: "legs", exercises: [
+      { id: "goblet_squat", name: "Dumbbell Goblet Squat", sr: "3 × 6–10", step: 5 },
+      { id: "bulgarian_split", name: "Bulgarian Split Squat", sr: "3 × 6–10 / leg", step: 5 },
+      { id: "db_rdl", name: "Dumbbell Romanian Deadlift", sr: "3 × 6–10", step: 5 },
+      { id: "cable_ham_curl", name: "Cable Hamstring Curl", sr: "3 × 8–12", step: 5 },
+      { id: "cable_knee_ext", name: "Cable Knee Extension", sr: "3 × 10–15", step: 5 },
+      { id: "cable_glute_kick", name: "Cable Glute Kickback", sr: "2 × 10–15 / leg", step: 5 },
+      { id: "standing_calf", name: "Standing Calf Raise", sr: "3 × 8–15", step: 5 } ] },
+    { name: "Rest", stretch: "rest" },
+    { name: "Upper", warm: "upper", stretch: "upper", exercises: [
+      { id: "handstand", name: "Handstand Practice", sr: "10–15 min", step: 5 },
+      { id: "explosive_pushup", name: "Explosive Push-Ups", sr: "3 × 3–6", step: 5 },
+      { id: "explosive_pullup", name: "Explosive Pull-Ups", sr: "3 × 3–5", step: 5 },
+      { id: "l_sit", name: "L-Sit", sr: "3 × 10–30 sec", step: 5 },
+      { id: "planche_lean", name: "Planche Lean", sr: "3 × 10–30 sec", step: 5 },
+      { id: "scap_pullup", name: "Scapular Pull-Ups", sr: "3 × 8–15", step: 5 },
+      { id: "scap_pushup", name: "Scapular Push-Ups", sr: "3 × 12–20", step: 5 },
+      { id: "cable_ext_rot", name: "Cable External Rotation", sr: "2 × 15–20 / arm", step: 2.5 },
+      { id: "cable_face_pull", name: "Cable Face Pull", sr: "2 × 15–20", step: 5 },
+      { id: "cable_serratus", name: "Cable Serratus Punch", sr: "2 × 12–20 / arm", step: 2.5 },
+      { id: "wrist_pro_sup", name: "Wrist Pronation/Supination", sr: "2 × 12–20 / direction", step: 2.5 } ] },
+    { name: "Lower", warm: "lower", stretch: "lower", exercises: [
+      { id: "kb_swing", name: "Kettlebell Swings", sr: "3 × 8–12", step: 5 },
+      { id: "broad_jump", name: "Broad Jumps", sr: "3 × 3–5", step: 5 },
+      { id: "lateral_bound", name: "Lateral Bounds", sr: "3 × 4–6 / side", step: 5 },
+      { id: "cossack", name: "Cossack Squat", sr: "3 × 6–10 / side", step: 5 },
+      { id: "sl_rdl", name: "Single-Leg Romanian Deadlift", sr: "3 × 8–12 / leg", step: 5 },
+      { id: "copenhagen", name: "Copenhagen Plank", sr: "3 × 20–45 sec / side", step: 5 },
+      { id: "cable_hip_abd", name: "Cable Hip Abduction", sr: "2 × 12–20 / leg", step: 5 },
+      { id: "cable_hip_add", name: "Cable Hip Adduction", sr: "2 × 12–20 / leg", step: 5 },
+      { id: "tib_raise", name: "Tibialis Raises", sr: "3 × 15–25", step: 5 },
+      { id: "sl_calf", name: "Single-Leg Calf Raise", sr: "3 × 12–20", step: 5 },
+      { id: "sl_balance", name: "Single-Leg Balance", sr: "2 × 30–60 sec / leg", step: 5 } ] },
+    { name: "Rest", stretch: "rest" }
+  ]
+};
+
+// ================= STORAGE =================
+// Everything lives in localStorage, every key starts with wkt_v1_
+const PREFIX = "wkt_v1_";
+function load(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(PREFIX + key)) ?? fallback; }
+  catch (e) { return fallback; }
+}
+function save(key, value) { localStorage.setItem(PREFIX + key, JSON.stringify(value)); }
+
+let weights = load("weights", {});   // { exerciseId: number or null (null = bodyweight) }
+let history = load("history", {});   // { exerciseId: [ {date, weight}, ... ] }
+let checks  = load("checks", {});    // { exerciseId: true }
+let day     = load("day", 0);        // index of the day currently shown
+if (!WORKOUT.days[day]) day = 0;
+
+// ================= HELPERS =================
+const $app = document.getElementById("app");
+const $nav = document.getElementById("nav");
+const today = () => new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local time
+const list = items => `<ul class="list">${items.map(i => `<li>${i}</li>`).join("")}</ul>`;
+const section = (title, html, open) =>
+  `<details class="sec" ${open ? "open" : ""}><summary>${title}</summary><div class="body">${html}</div></details>`;
+const cap = s => s[0].toUpperCase() + s.slice(1);
+const findEx = id => WORKOUT.days.flatMap(d => d.exercises || []).find(e => e.id === id);
+
+function historyHtml(id) {
+  const h = (history[id] || []).slice(-10).reverse();
+  if (!h.length) return "No changes yet.";
+  return h.map(e => `${e.date} — ${e.weight === null ? "BW" : e.weight + " lbs"}`).join("<br>");
+}
+
+// Returns true if the weight actually changed (and logs it)
+function setWeight(id, value) {
+  const old = weights[id] ?? null;
+  const val = (value === null || isNaN(value) || value <= 0) ? null : Math.round(value * 100) / 100;
+  if (val === old) return false;
+  weights[id] = val;
+  (history[id] = history[id] || []).push({ date: today(), weight: val });
+  save("weights", weights);
+  save("history", history);
+  return true;
+}
+
+// ================= RENDER =================
+function exerciseRow(e) {
+  const w = weights[e.id];
+  return `<div class="ex ${checks[e.id] ? "done" : ""}" data-id="${e.id}">
+    <div class="top" data-act="check">
+      <span class="box">${checks[e.id] ? "✓" : ""}</span>
+      <span class="nm">${e.name}</span>
+      <span class="sr">${e.sr}</span>
+    </div>
+    <div class="wt">
+      <button data-act="minus">−</button>
+      <input inputmode="decimal" placeholder="BW" value="${w ?? ""}">
+      <span>lbs</span>
+      <button data-act="plus">+</button>
+    </div>
+    <details><summary>History</summary><div class="hist">${historyHtml(e.id)}</div></details>
+  </div>`;
+}
+
+function render() {
+  $nav.innerHTML = WORKOUT.days.map((d, i) =>
+    `<button class="daybtn ${i === day ? "on" : ""}" data-act="day" data-i="${i}"><b>${i + 1}</b>${d.name}</button>`).join("");
+
+  const d = WORKOUT.days[day];
+  let html = `<h1>Day ${day + 1} — ${d.name}</h1>`;
+  if (!d.exercises) {
+    html += section("Stretch", list(WORKOUT.stretch.rest), true);
+  } else {
+    html += section("Warm-up", list(WORKOUT.warmup.general) + `<h3>${cap(d.warm)} warm-up</h3>` + list(WORKOUT.warmup[d.warm]), false);
+    html += section("Workout", d.exercises.map(exerciseRow).join(""), true);
+    html += section("Stretch", list(WORKOUT.stretch[d.stretch]), false);
+  }
+  html += `<div class="data"><button data-act="export">Export data</button><button data-act="import">Import data</button></div>`;
+  html += `<div class="bar"><button data-act="reset">Reset day</button><button class="next" data-act="next">Next day ▶</button></div>`;
+  $app.innerHTML = html;
+}
+
+function goToDay(i) {
+  day = i;
+  save("day", day);
+  render();
+  window.scrollTo(0, 0);
+}
+
+// Update just one row's weight box + history (so the page doesn't jump)
+function refreshRow(row, id) {
+  row.querySelector("input").value = weights[id] ?? "";
+  row.querySelector(".hist").innerHTML = historyHtml(id);
+}
+
+// ================= EVENTS =================
+function onClick(ev) {
+  const btn = ev.target.closest("[data-act]");
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const row = btn.closest(".ex");
+  const id = row && row.dataset.id;
+
+  if (act === "day") goToDay(Number(btn.dataset.i));
+  else if (act === "next") goToDay((day + 1) % WORKOUT.days.length);
+  else if (act === "check") {
+    if (checks[id]) delete checks[id]; else checks[id] = true;
+    save("checks", checks);
+    row.classList.toggle("done", !!checks[id]);
+    row.querySelector(".box").textContent = checks[id] ? "✓" : "";
+  }
+  else if (act === "minus" || act === "plus") {
+    const step = findEx(id).step;
+    const cur = weights[id] || 0;
+    setWeight(id, act === "plus" ? cur + step : cur - step);
+    refreshRow(row, id);
+  }
+  else if (act === "reset") {
+    if (!confirm("Clear all check-offs for this day? Weights are kept.")) return;
+    (WORKOUT.days[day].exercises || []).forEach(e => delete checks[e.id]); // checks only, never weights
+    save("checks", checks);
+    render();
+  }
+  else if (act === "export") exportData();
+  else if (act === "import") document.getElementById("file").click();
+}
+
+// Typing an exact weight
+function onChange(ev) {
+  if (!ev.target.matches(".wt input")) return;
+  const row = ev.target.closest(".ex");
+  const id = row.dataset.id;
+  const raw = ev.target.value.trim().replace(",", ".");
+  if (raw !== "" && isNaN(parseFloat(raw))) { refreshRow(row, id); return; } // ignore junk
+  setWeight(id, raw === "" ? null : parseFloat(raw));
+  refreshRow(row, id);
+}
+
+$app.addEventListener("click", onClick);
+$nav.addEventListener("click", onClick);
+$app.addEventListener("change", onChange);
+
+// ================= EXPORT / IMPORT =================
+function exportData() {
+  const data = { app: "wkt_v1", exported: new Date().toISOString(), weights, history, checks, day };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `workout-backup-${today()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+document.getElementById("file").addEventListener("change", ev => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const d = JSON.parse(reader.result);
+      if (d.app !== "wkt_v1") throw new Error("Not a workout backup");
+      weights = d.weights || {}; history = d.history || {}; checks = d.checks || {};
+      if (WORKOUT.days[d.day]) day = d.day;
+      save("weights", weights); save("history", history); save("checks", checks); save("day", day);
+      render();
+      alert("Import done.");
+    } catch (e) { alert("Import failed: " + e.message); }
+  };
+  reader.readAsText(file);
+  ev.target.value = "";
+});
+
+// ================= START =================
+render();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
