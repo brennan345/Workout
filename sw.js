@@ -1,5 +1,5 @@
 // Bump this number whenever you edit index.html so phones fetch the new copy
-const CACHE = "wkt-cache-v1";
+const CACHE = "wkt-cache-v2";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
